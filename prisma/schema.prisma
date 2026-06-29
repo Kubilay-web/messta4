@@ -175,6 +175,7 @@ model User {
   role        Role           @default(USER)
   rolejob     RoleJob        @default(CANDIDATE)
   roleshop    RoleShop       @default(USER)
+  shopNewRole ShopNewRole    @default(CUSTOMER) // Shop modülüne özel rol
   roleestate  RoleRealEstate @default(USER)
   roleproject RoleProject    @default(USER)
 
@@ -7066,6 +7067,14 @@ model EmlakInquiry {
 // Shop - Tek ürünlük (single-product) e-ticaret
 // Bağımsız, kendine ait modeller. Diğer modellerle coupling yok.
 // ============================================================
+
+// Shop'a özel rol enum'u. Paylaşılan RoleShop'tan ayrı tutulur ki
+// mağaza yetkilendirmesi diğer modüllerden bağımsız kalsın.
+enum ShopNewRole {
+  CUSTOMER // müşteri (satın alma)
+  ADMIN    // yönetici (tam yetki)
+  SELLER   // satıcı (ürün/sipariş yönetimi)
+}
 
 model ShopProduct {
   id          String   @id @default(cuid()) @map("_id")

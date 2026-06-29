@@ -3,10 +3,15 @@
 import db from "@/app/lib/db";
 import { validateRequest } from "@/app/auth";
 import { NextResponse } from "next/server";
+import { requireShopAdmin } from "../../lib/auth";
 
-// GET -> tüm siparişleri (en yeni önce) listeler
+// GET (admin) -> tüm siparişleri (en yeni önce) listeler
 export async function GET() {
   try {
+    const guard = await requireShopAdmin();
+    if (guard.error)
+      return NextResponse.json({ error: guard.error }, { status: guard.status });
+
     const orders = await db.shopOrder.findMany({
       orderBy: { createdAt: "desc" },
       include: { product: { select: { name: true, slug: true } } },

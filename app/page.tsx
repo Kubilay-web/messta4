@@ -55,12 +55,12 @@ export default async function Home() {
             </span>
           </Link>
           <nav className="flex items-center gap-1 sm:gap-2">
-            <Link
+            {/* <Link
               href={shopHref}
               className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"
             >
               Mağaza
-            </Link>
+            </Link> */}
             <a
               href={SITE.phoneHref}
               className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 md:block"
@@ -72,7 +72,7 @@ export default async function Home() {
                 href="/shop"
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
               >
-                Panel
+                Mağaza
               </Link>
             ) : (
               <Link

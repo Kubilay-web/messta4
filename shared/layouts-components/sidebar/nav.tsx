@@ -255,6 +255,13 @@ export const getMenuItems = (_user?: { agencyId?: string | null }) => [
         selected: false,
         title: "Mağaza",
       },
+      {
+        path: "/shop/admin",
+        type: "link",
+        active: false,
+        selected: false,
+        title: "Admin Paneli",
+      },
     ],
   },
   // {

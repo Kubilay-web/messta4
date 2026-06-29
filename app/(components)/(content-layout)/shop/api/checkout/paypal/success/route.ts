@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/app/lib/db";
 import paypal from "@paypal/checkout-server-sdk";
+import { sendInvoiceEmail } from "../../../../lib/invoice";
 
 const initializePayPal = () => {
   const clientId = process.env.PAYPAL_CLIENT_ID!;
@@ -63,10 +64,39 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${baseUrl}/shop?payment_error=1`);
     }
 
-    await db.shopOrder.update({
+    // Yalnızca ilk PAID geçişinde fatura maili gönder (çift mail önlenir)
+    const existing = await db.shopOrder.findUnique({
+      where: { id: orderId },
+    });
+    const alreadyPaid = existing?.status === "PAID";
+
+    const order = await db.shopOrder.update({
       where: { id: orderId },
       data: { status: "PAID" },
+      include: { product: { select: { name: true, currency: true } } },
     });
+
+    if (!alreadyPaid) {
+      try {
+        await sendInvoiceEmail({
+          id: order.id,
+          createdAt: order.createdAt,
+          customerName: order.customerName,
+          email: order.email,
+          phone: order.phone,
+          address: order.address,
+          city: order.city,
+          quantity: order.quantity,
+          unitPrice: order.unitPrice,
+          totalPrice: order.totalPrice,
+          status: order.status,
+          productName: order.product?.name || "Ürün",
+          currency: order.product?.currency || "TRY",
+        });
+      } catch (mailErr) {
+        console.error("[shop/paypal success] fatura maili gonderilemedi", mailErr);
+      }
+    }
 
     console.log("[shop/paypal success] order marked PAID:", orderId);
     return NextResponse.redirect(`${baseUrl}/shop?payment_success=1`);

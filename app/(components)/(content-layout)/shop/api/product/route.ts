@@ -1,20 +1,25 @@
 // app/(components)/(content-layout)/shop/api/product/route.ts
-// Shop - tek ürünlük mağazanın ürün endpoint'i.
-// Doğrudan DB ile konuşur, ekstra katman yok.
+// Shop - tek ürün getirme (?slug= ile slug'a göre, yoksa en yeni aktif ürün)
+// ve admin için hızlı ürün ekleme/güncelleme (upsert, demo seed).
 import db from "@/app/lib/db";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { requireShopAdmin } from "../../lib/auth";
 
-// GET -> satışta olan tek (aktif) ürünü döner
-export async function GET() {
+// GET -> ?slug= verilirse o ürünü, verilmezse en yeni aktif ürünü döner.
+export async function GET(req: NextRequest) {
   try {
-    const product = await db.shopProduct.findFirst({
-      where: { active: true },
-      orderBy: { createdAt: "desc" },
-    });
+    const slug = req.nextUrl.searchParams.get("slug");
+
+    const product = slug
+      ? await db.shopProduct.findUnique({ where: { slug } })
+      : await db.shopProduct.findFirst({
+          where: { active: true },
+          orderBy: { createdAt: "desc" },
+        });
 
     if (!product) {
       return NextResponse.json(
-        { error: "Aktif ürün bulunamadı" },
+        { error: "Ürün bulunamadı" },
         { status: 404 }
       );
     }
@@ -29,9 +34,13 @@ export async function GET() {
   }
 }
 
-// POST -> ürünü oluşturur ya da slug üzerinden günceller (seed / admin)
+// POST (admin) -> ürünü slug üzerinden oluşturur ya da günceller (upsert / demo seed)
 export async function POST(req: Request) {
   try {
+    const guard = await requireShopAdmin();
+    if (guard.error)
+      return NextResponse.json({ error: guard.error }, { status: guard.status });
+
     const body = await req.json();
     const {
       name,

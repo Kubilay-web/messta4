@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/app/lib/db";
 import Stripe from "stripe";
+import { sendInvoiceEmail } from "../../../../lib/invoice";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-08-27.basil",
@@ -37,10 +38,41 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${baseUrl}/shop?payment_error=1`);
     }
 
-    await db.shopOrder.update({
+    // Mevcut durumu oku: yalnızca ilk PAID geçişinde fatura maili gönder
+    // (kullanıcı sayfayı yenilerse çift mail önlenir).
+    const existing = await db.shopOrder.findUnique({
+      where: { id: orderId },
+      include: { product: { select: { name: true, currency: true } } },
+    });
+    const alreadyPaid = existing?.status === "PAID";
+
+    const order = await db.shopOrder.update({
       where: { id: orderId },
       data: { status: "PAID" },
+      include: { product: { select: { name: true, currency: true } } },
     });
+
+    if (!alreadyPaid) {
+      try {
+        await sendInvoiceEmail({
+          id: order.id,
+          createdAt: order.createdAt,
+          customerName: order.customerName,
+          email: order.email,
+          phone: order.phone,
+          address: order.address,
+          city: order.city,
+          quantity: order.quantity,
+          unitPrice: order.unitPrice,
+          totalPrice: order.totalPrice,
+          status: order.status,
+          productName: order.product?.name || "Ürün",
+          currency: order.product?.currency || "TRY",
+        });
+      } catch (mailErr) {
+        console.error("[shop/stripe success] fatura maili gonderilemedi", mailErr);
+      }
+    }
 
     console.log("[shop/stripe success] order marked PAID:", orderId);
     return NextResponse.redirect(`${baseUrl}/shop?payment_success=1`);

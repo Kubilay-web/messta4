@@ -26,6 +26,7 @@ export const lucia = new Lucia(adapter, {
       role: databaseUserAttributes.role,
       rolejob: databaseUserAttributes.rolejob,
       roleshop:databaseUserAttributes.roleshop,
+      shopNewRole:databaseUserAttributes.shopNewRole,
       roleestate:databaseUserAttributes.roleestate,
       rolemedical:databaseUserAttributes.rolemedical,
       roleproject:databaseUserAttributes.roleproject,
@@ -55,6 +56,7 @@ interface DatabaseUserAttributes {
   role: string | null;
   rolejob: string | null;
   roleshop:string|null;
+  shopNewRole:string|null;
   roleestate:string|null;
   rolemedical:string|null;
   email: string;
