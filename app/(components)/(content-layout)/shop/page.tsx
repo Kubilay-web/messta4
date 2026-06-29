@@ -3,6 +3,9 @@
 import Seo from "@/shared/layouts-components/seo/seo";
 import Pageheader from "@/shared/layouts-components/page-header/pageheader";
 import React, { Fragment, useEffect, useMemo, useState } from "react";
+import { Toaster, toast } from "sonner";
+
+type PaymentMethod = "stripe" | "paypal";
 
 interface ShopProduct {
   id: string;
@@ -46,8 +49,8 @@ const Shop = () => {
   const [qty, setQty] = useState(1);
 
   const [form, setForm] = useState<OrderForm>(emptyForm);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("stripe");
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [seeding, setSeeding] = useState(false);
 
@@ -78,6 +81,21 @@ const Shop = () => {
     fetchProduct();
   }, []);
 
+  // Ödeme dönüşünde URL bayraklarına göre toaster göster, sonra URL'i temizle
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment_success")) {
+      toast.success("Ödeme başarılı! Siparişiniz alındı.");
+    } else if (params.get("payment_cancelled")) {
+      toast.warning("Ödeme iptal edildi.");
+    } else if (params.get("payment_error")) {
+      toast.error("Ödeme tamamlanamadı. Lütfen tekrar deneyin.");
+    } else {
+      return;
+    }
+    window.history.replaceState({}, "", "/shop");
+  }, []);
+
   const total = useMemo(
     () => (product ? product.price * qty : 0),
     [product, qty]
@@ -101,24 +119,25 @@ const Shop = () => {
     if (!product) return;
     setSubmitting(true);
     setFormError(null);
-    setSuccess(null);
     try {
-      const res = await fetch("/shop/api/order", {
+      const res = await fetch("/shop/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, productId: product.id, quantity: qty }),
+        body: JSON.stringify({
+          ...form,
+          productId: product.id,
+          quantity: qty,
+          paymentMethod,
+        }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Sipariş oluşturulamadı");
-      setSuccess(
-        `Siparişiniz alındı! Sipariş No: ${data.order.id.slice(-8).toUpperCase()}`
-      );
-      setForm(emptyForm);
-      setQty(1);
-      fetchProduct(); // stok güncelle
+      if (!res.ok || !data.paymentUrl)
+        throw new Error(data.error || "Ödeme başlatılamadı");
+      // Ödeme sağlayıcısına yönlendir (Stripe / PayPal)
+      window.location.href = data.paymentUrl;
     } catch (err: any) {
       setFormError(err.message);
-    } finally {
+      toast.error(err.message);
       setSubmitting(false);
     }
   };
@@ -160,6 +179,7 @@ const Shop = () => {
 
   return (
     <Fragment>
+      <Toaster richColors position="top-right" />
       <Seo title="Mağaza" />
       <Pageheader
         Heading="Mağaza"
@@ -371,12 +391,6 @@ const Shop = () => {
               <h5 className="box-title">Sipariş Bilgileri</h5>
             </div>
             <div className="box-body">
-              {success && (
-                <div className="bg-success/10 text-success border border-success/20 rounded-md p-3 mb-4 flex items-center gap-2">
-                  <i className="ri-checkbox-circle-line text-lg"></i>
-                  <span>{success}</span>
-                </div>
-              )}
               {formError && (
                 <div className="bg-danger/10 text-danger border border-danger/20 rounded-md p-3 mb-4 flex items-center gap-2">
                   <i className="ri-error-warning-line text-lg"></i>
@@ -461,6 +475,44 @@ const Shop = () => {
                   />
                 </div>
 
+                {/* Ödeme yöntemi */}
+                <div className="flex flex-col gap-2">
+                  <label className="form-label mb-0">Ödeme Yöntemi *</label>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {(
+                      [
+                        {
+                          key: "stripe" as PaymentMethod,
+                          label: "Kredi / Banka Kartı",
+                          icon: "ri-bank-card-line",
+                        },
+                        {
+                          key: "paypal" as PaymentMethod,
+                          label: "PayPal",
+                          icon: "ri-paypal-line",
+                        },
+                      ]
+                    ).map((opt) => (
+                      <button
+                        type="button"
+                        key={opt.key}
+                        onClick={() => setPaymentMethod(opt.key)}
+                        className={`flex-1 flex items-center gap-2 border rounded-md px-4 py-3 transition-all ${
+                          paymentMethod === opt.key
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-defaultborder dark:border-defaultborder/10 hover:border-primary/50"
+                        }`}
+                      >
+                        <i className={`${opt.icon} text-xl`}></i>
+                        <span className="font-medium">{opt.label}</span>
+                        {paymentMethod === opt.key && (
+                          <i className="ri-checkbox-circle-fill ms-auto text-primary"></i>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-defaultborder dark:border-defaultborder/10">
                   <div className="flex items-center gap-2">
                     <span className="text-muted">Ödenecek Tutar:</span>
@@ -474,11 +526,13 @@ const Shop = () => {
                     className="ti-btn ti-btn-primary w-full sm:w-auto"
                   >
                     {submitting ? (
-                      "Gönderiliyor..."
+                      "Yönlendiriliyor..."
                     ) : (
                       <>
                         <i className="ri-secure-payment-line me-1"></i>
-                        Siparişi Tamamla
+                        {paymentMethod === "paypal"
+                          ? "PayPal ile Öde"
+                          : "Kartla Öde"}
                       </>
                     )}
                   </button>
