@@ -1,6 +1,7 @@
 // app/(components)/(content-layout)/shop/api/order/route.ts
 // Shop - sipariş (checkout) endpoint'i. Doğrudan DB.
 import db from "@/app/lib/db";
+import { validateRequest } from "@/app/auth";
 import { NextResponse } from "next/server";
 
 // GET -> tüm siparişleri (en yeni önce) listeler
@@ -23,6 +24,8 @@ export async function GET() {
 // POST -> sipariş oluşturur, fiyatı sunucuda hesaplar, stoğu düşürür
 export async function POST(req: Request) {
   try {
+    // Login varsa siparişi üyeye bağla, misafirse null kalır
+    const { user } = await validateRequest();
     const body = await req.json();
     const {
       productId,
@@ -74,6 +77,7 @@ export async function POST(req: Request) {
     const order = await db.shopOrder.create({
       data: {
         productId: product.id,
+        userId: user?.id ?? null,
         quantity: qty,
         unitPrice,
         totalPrice,

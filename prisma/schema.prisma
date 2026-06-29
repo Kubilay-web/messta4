@@ -77,6 +77,7 @@ model User {
   folders            Folder[]
   portfolioProfile   PortfolioProfile?
   subscribersProject Subscriber[]
+  shopOrders         ShopOrder[]       @relation("UserToShopOrder")
   isVerfied          Boolean           @default(false)
   token              Int?
 
@@ -7055,6 +7056,12 @@ model EmlakInquiry {
   @@map("emlak_inquiries")
 }
 
+
+
+
+
+
+
 // ============================================================
 // Shop - Tek ürünlük (single-product) e-ticaret
 // Bağımsız, kendine ait modeller. Diğer modellerle coupling yok.
@@ -7088,6 +7095,10 @@ model ShopOrder {
   productId  String
   product    ShopProduct @relation("ShopProductToOrder", fields: [productId], references: [id])
 
+  // Giriş yapmış üyeye bağlı sipariş (misafir siparişlerde null kalır)
+  userId String?
+  user   User?   @relation("UserToShopOrder", fields: [userId], references: [id])
+
   quantity   Int    @default(1)
   unitPrice  Float
   totalPrice Float
@@ -7105,5 +7116,6 @@ model ShopOrder {
   updatedAt DateTime @updatedAt
 
   @@index([productId])
+  @@index([userId])
   @@map("shop_orders")
 }
