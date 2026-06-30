@@ -4,7 +4,8 @@ import "./globals.scss";
 import ClientProviders from "./ClientProviders";
 import { validateRequest } from "./auth";
 import SessionProvider from "./SessionProvider";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
+import { isAppLocale, LOCALE_COOKIE } from "./lib/locale";
 
 export async function generateMetadata() {
   const headersList = await headers();
@@ -39,10 +40,15 @@ export default async function RootLayout({
   const headersList = await headers();
   const host = headersList.get("x-hostname");
 
-  const lang =
-    host?.includes("de") ? "de" :
-    host?.includes("at") ? "de-AT" :
-    "en";
+  // Kullanıcının seçtiği dil çerezi (NEXT_LOCALE) önceliklidir; yoksa alan adına göre.
+  const cookieLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
+  const lang = isAppLocale(cookieLocale)
+    ? cookieLocale
+    : host?.includes("de")
+    ? "de"
+    : host?.includes("at")
+    ? "de-AT"
+    : "en";
 
   return (
     <html lang={lang} suppressHydrationWarning>

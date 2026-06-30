@@ -2,8 +2,11 @@
 import SpkOverlay from "@/shared/@spk-reusable-components/uielements/spk-overlay";
 import Link from "next/link";
 import { Fragment } from "react";
+import { useClientLocale } from "@/app/lib/useLocale";
+import { translateNav } from "./nav-i18n";
 
 function Menuloop({ MENUITEMS, toggleSidemenu, level, HoverToggleInnerMenuFn }: any) {
+  const lang = useClientLocale();
   const handleClick = (event:any) => {
 		// Your logic here
 		event.preventDefault(); // Prevents the default anchor behavior (navigation)
@@ -20,7 +23,7 @@ function Menuloop({ MENUITEMS, toggleSidemenu, level, HoverToggleInnerMenuFn }: 
             <SpkOverlay customClass={`[--placement:${localStorage.mamixrtl ? "left" : "right"}]`}>
               <span className='side-menu__icon'>{MENUITEMS.icon}</span>
               <span className="hs-tooltip-content ti-main-tooltip-content !border-black py-1 px-2 !bg-black !text-xs !font-medium !text-white shadow-sm" role="tooltip">
-                {MENUITEMS.title}
+                {translateNav(MENUITEMS.title, lang)}
               </span>
             </SpkOverlay>
 
@@ -31,7 +34,7 @@ function Menuloop({ MENUITEMS, toggleSidemenu, level, HoverToggleInnerMenuFn }: 
           )
         )}
 
-        <span className={`${level === 1 ? "side-menu__label" : ""}`}>{MENUITEMS.title} {MENUITEMS.badgetxt ? (<span className={MENUITEMS.class}> {MENUITEMS.badgetxt} </span>
+        <span className={`${level === 1 ? "side-menu__label" : ""}`}>{translateNav(MENUITEMS.title, lang)} {MENUITEMS.badgetxt ? (<span className={MENUITEMS.class}> {MENUITEMS.badgetxt} </span>
         ) : (
           ""
         )}
@@ -45,7 +48,7 @@ function Menuloop({ MENUITEMS, toggleSidemenu, level, HoverToggleInnerMenuFn }: 
         style={MENUITEMS.active ? { display: "block" } : { display: "none" }}>
         {level <= 1 ? (
           <li className="slide side-menu__label1">
-            <Link href="#!">{MENUITEMS.title}</Link>
+            <Link href="#!">{translateNav(MENUITEMS.title, lang)}</Link>
           </li>
         ) : (
           ""
@@ -61,7 +64,7 @@ function Menuloop({ MENUITEMS, toggleSidemenu, level, HoverToggleInnerMenuFn }: 
             key={firstlevel.id || firstlevel.title}>
             {firstlevel.type === "link" ? (
               <Link href={firstlevel.path || "#!"} className={`side-menu__item ${firstlevel.selected ? "active" : ""}`}>
-                {firstlevel.icon} <span className="">{firstlevel.title} {firstlevel.badgetxt ? (<span className={firstlevel.class}> {firstlevel.badgetxt}</span>
+                {firstlevel.icon} <span className="">{translateNav(firstlevel.title, lang)} {firstlevel.badgetxt ? (<span className={firstlevel.class}> {firstlevel.badgetxt}</span>
                 ) : (
                   ""
                 )}
@@ -73,7 +76,7 @@ function Menuloop({ MENUITEMS, toggleSidemenu, level, HoverToggleInnerMenuFn }: 
 
             {firstlevel.type === "empty" ? (
               <Link href="#!" className="side-menu__item" onClick={handleClick}>
-                {firstlevel.icon} <span className=""> {firstlevel.title} </span>
+                {firstlevel.icon} <span className=""> {translateNav(firstlevel.title, lang)} </span>
               </Link>
             ) : (
               ""

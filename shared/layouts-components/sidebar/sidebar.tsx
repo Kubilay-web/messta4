@@ -12,11 +12,14 @@ import Image from "next/image";
 import nextConfig from "@/next.config";
 import { useSession } from "@/app/SessionProvider";
 import SidebarNew from "@/shared/layouts-components/sidebarnew/layouts/sidebar/page";
+import { useClientLocale } from "@/app/lib/useLocale";
+import { translateNav } from "./nav-i18n";
 // import { SchoolUser } from "@/app/(components)/(content-layout)/realestate/actions/auth";
 
 const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
   let { basePath } = nextConfig;
   const { user } = useSession();
+  const lang = useClientLocale();
 
   const [menuitems, setMenuitems] = useState(getMenuItems(user));
 
@@ -829,7 +832,7 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
                   >
                     {levelone.menutitle ? (
                       <span className="category-name">
-                        {levelone.menutitle}
+                        {translateNav(levelone.menutitle, lang)}
                       </span>
                     ) : (
                       ""
@@ -856,7 +859,7 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
                                 className="hs-tooltip-content  ti-main-tooltip-content !border-black py-1 px-2 !bg-black !text-xs !font-medium !text-white shadow-sm "
                                 role="tooltip"
                               >
-                                {levelone.title}
+                                {translateNav(levelone.title, lang)}
                               </span>
                             </SpkOverlay>
                           </div>
@@ -866,7 +869,7 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
                           </span>
                         )}
                         <span className="side-menu__label">
-                          {levelone.title}{" "}
+                          {translateNav(levelone.title, lang)}{" "}
                           {levelone.badgetxt ? (
                             <span className={levelone.class}>
                               {" "}
@@ -889,7 +892,7 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
                       >
                         {levelone.icon}
                         <span className="">
-                          {levelone.title}{" "}
+                          {translateNav(levelone.title, lang)}{" "}
                           {levelone.badgetxt ? (
                             <span className={levelone.class}>
                               {levelone.badgetxt}{" "}

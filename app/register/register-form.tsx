@@ -4,9 +4,11 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signUp } from "../(components)/(authentication-layout)/authentication/sign-up/actions";
+import { useSiteLang, SiteLangSwitcher } from "@/app/components/site-i18n/SiteLang";
 
 export default function RegisterForm({ redirect = "/shop" }: { redirect?: string }) {
   const router = useRouter();
+  const { t } = useSiteLang();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,10 +17,10 @@ export default function RegisterForm({ redirect = "/shop" }: { redirect?: string
   const [pending, start] = useTransition();
 
   function validate(): string | null {
-    if (!username.trim() || !email.trim() || !password) return "Tüm alanlar zorunludur.";
-    if (!/^[a-zA-Z0-9_-]+$/.test(username)) return "Kullanıcı adı yalnızca harf, rakam, - ve _ içerebilir.";
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return "Geçerli bir e-posta girin.";
-    if (password.length < 8) return "Şifre en az 8 karakter olmalı.";
+    if (!username.trim() || !email.trim() || !password) return t("regAllRequired");
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) return t("regUsernameRule");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return t("regInvalidEmail");
+    if (password.length < 8) return t("regPasswordMin");
     return null;
   }
 
@@ -36,7 +38,7 @@ export default function RegisterForm({ redirect = "/shop" }: { redirect?: string
         if (res?.error) setError(res.error);
         else router.push(redirect);
       } catch {
-        setError("Beklenmeyen bir hata oluştu.");
+        setError(t("unexpectedError"));
       }
     });
   }
@@ -61,16 +63,15 @@ export default function RegisterForm({ redirect = "/shop" }: { redirect?: string
           </Link>
           <div>
             <h2 className="text-4xl font-extrabold leading-tight">
-              Aramıza katıl, <br /> alışverişe başla.
+              {t("regBrandTitle1")} <br /> {t("regBrandTitle2")}
             </h2>
             <p className="mt-3 max-w-md text-indigo-100">
-              Ücretsiz üye ol; tek tıkla sipariş ver, siparişlerini takip et ve
-              kampanyalardan yararlan.
+              {t("regBrandDesc")}
             </p>
             <ul className="mt-5 space-y-2 text-sm text-indigo-100">
-              <li>✓ Hızlı ve güvenli ödeme</li>
-              <li>✓ Sipariş geçmişi & takip</li>
-              <li>✓ Üyelere özel indirimler</li>
+              <li>✓ {t("brandPerk1")}</li>
+              <li>✓ {t("regPerk2")}</li>
+              <li>✓ {t("regPerk3")}</li>
             </ul>
           </div>
           <p className="text-xs text-indigo-200">© 2026 Shop</p>
@@ -78,7 +79,10 @@ export default function RegisterForm({ redirect = "/shop" }: { redirect?: string
       </div>
 
       {/* Sağ: form */}
-      <div className="flex flex-1 items-center justify-center bg-gray-50 px-4 py-10">
+      <div className="relative flex flex-1 items-center justify-center bg-gray-50 px-4 py-10">
+        <div className="absolute right-4 top-4">
+          <SiteLangSwitcher />
+        </div>
         <div className="w-full max-w-sm">
           <Link href="/" className="mb-6 inline-flex items-center gap-2 lg:hidden">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-lg font-extrabold text-white">
@@ -87,10 +91,10 @@ export default function RegisterForm({ redirect = "/shop" }: { redirect?: string
             <span className="text-lg font-extrabold text-gray-900">Shop</span>
           </Link>
 
-          <h1 className="text-2xl font-bold text-gray-800">Üye Ol</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Birkaç saniyede ücretsiz hesabını oluştur.
-          </p>
+          <h1 className="text-2xl font-bold text-gray-800">
+            {t("registerTitle")}
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">{t("registerSubtitle")}</p>
 
           <form onSubmit={submit} className="mt-6 flex flex-col gap-4">
             {error && (
@@ -101,7 +105,7 @@ export default function RegisterForm({ redirect = "/shop" }: { redirect?: string
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-600">
-                Kullanıcı Adı
+                {t("username")}
               </label>
               <input
                 value={username}
@@ -113,7 +117,9 @@ export default function RegisterForm({ redirect = "/shop" }: { redirect?: string
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-600">E-posta</label>
+              <label className="text-sm font-medium text-gray-600">
+                {t("email")}
+              </label>
               <input
                 type="email"
                 value={email}
@@ -125,13 +131,15 @@ export default function RegisterForm({ redirect = "/shop" }: { redirect?: string
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-600">Şifre</label>
+              <label className="text-sm font-medium text-gray-600">
+                {t("password")}
+              </label>
               <div className="relative">
                 <input
                   type={show ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="En az 8 karakter"
+                  placeholder={t("passwordHint")}
                   autoComplete="new-password"
                   className="w-full rounded-lg border border-gray-200 px-3 py-2.5 pr-16 text-sm outline-none focus:border-indigo-500"
                 />
@@ -140,7 +148,7 @@ export default function RegisterForm({ redirect = "/shop" }: { redirect?: string
                   onClick={() => setShow((v) => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-500 hover:text-gray-700"
                 >
-                  {show ? "Gizle" : "Göster"}
+                  {show ? t("hide") : t("show")}
                 </button>
               </div>
             </div>
@@ -150,26 +158,24 @@ export default function RegisterForm({ redirect = "/shop" }: { redirect?: string
               disabled={pending}
               className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
             >
-              {pending ? "Hesap oluşturuluyor..." : "Üye Ol"}
+              {pending ? t("creatingAccount") : t("registerTitle")}
             </button>
 
-            <p className="text-center text-[11px] text-gray-400">
-              Üye olarak kullanım koşullarını kabul etmiş sayılırsın.
-            </p>
+            <p className="text-center text-[11px] text-gray-400">{t("terms")}</p>
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-500">
-            Zaten hesabın var mı?{" "}
+            {t("haveAccount")}{" "}
             <Link
               href={`/login?redirect=${encodeURIComponent(redirect)}`}
               className="font-semibold text-indigo-600 hover:underline"
             >
-              Giriş Yap
+              {t("loginTitle")}
             </Link>
           </p>
           <p className="mt-2 text-center text-xs text-gray-400">
             <Link href="/" className="hover:text-gray-600">
-              ← Anasayfaya dön
+              {t("backHome")}
             </Link>
           </p>
         </div>

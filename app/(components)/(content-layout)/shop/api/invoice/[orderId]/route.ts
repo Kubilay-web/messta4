@@ -44,7 +44,7 @@ export async function GET(
       totalPrice: order.totalPrice,
       status: order.status,
       productName: order.product?.name || "Ürün",
-      currency: order.product?.currency || "TRY",
+      currency: order.currency || order.product?.currency || "TRY",
     });
 
     return new NextResponse(Buffer.from(pdfBytes), {

@@ -8,6 +8,7 @@ import { validateRequest } from "@/app/auth";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import paypal from "@paypal/checkout-server-sdk";
+import { getRates, convertAmount, SHOP_CURRENCIES } from "../../lib/rates";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-08-27.basil",
@@ -21,10 +22,7 @@ const initializePayPal = () => {
   return new paypal.core.PayPalHttpClient(environment);
 };
 
-// PayPal sandbox TRY'yi desteklemediği için basit sabit kur ile USD'ye çeviriyoruz.
-const TRY_TO_USD = 1 / 35;
-const toUsd = (amount: number, currency: string) =>
-  currency === "USD" ? amount : Number((amount * TRY_TO_USD).toFixed(2));
+const PAYMENT_METHODS = ["stripe", "paypal", "cod_cash", "cod_card"];
 
 export async function POST(req: Request) {
   try {
@@ -47,7 +45,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (paymentMethod !== "stripe" && paymentMethod !== "paypal") {
+    if (!PAYMENT_METHODS.includes(paymentMethod)) {
       return NextResponse.json(
         { error: "Geçersiz ödeme yöntemi" },
         { status: 400 }
@@ -75,10 +73,19 @@ export async function POST(req: Request) {
       );
     }
 
-    const unitPrice = product.price;
+    // Seçilen para birimi (alıcının görüntüleme tercihi). Fiyatı canlı kurla çevir.
+    const currency = SHOP_CURRENCIES.includes(body.currency)
+      ? body.currency
+      : product.currency;
+    const rates = await getRates();
+    const unitPrice = Number(
+      convertAmount(product.price, product.currency, currency, rates).toFixed(2)
+    );
     const totalPrice = Number((unitPrice * qty).toFixed(2));
 
-    // Siparişi PENDING olarak oluştur ve stoğu düş
+    const isCod = paymentMethod === "cod_cash" || paymentMethod === "cod_card";
+
+    // Siparişi PENDING (Sipariş Alındı) olarak oluştur ve stoğu düş
     const order = await db.shopOrder.create({
       data: {
         productId: product.id,
@@ -86,6 +93,8 @@ export async function POST(req: Request) {
         quantity: qty,
         unitPrice,
         totalPrice,
+        currency,
+        paymentMethod,
         customerName: String(body.customerName).trim(),
         email: String(body.email).trim(),
         phone: String(body.phone).trim(),
@@ -102,6 +111,17 @@ export async function POST(req: Request) {
     });
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+
+    // ---- KAPIDA ÖDEME (COD) ----
+    // Ödeme teslimatta yapılacağı için ödeme sağlayıcısına yönlendirme yok.
+    if (isCod) {
+      return NextResponse.json({
+        ok: true,
+        cod: true,
+        orderId: order.id,
+        redirectUrl: `/shop/orders?order_success=1`,
+      });
+    }
 
     // Stok geri alma (ödeme başlatılamazsa)
     const rollback = async () => {
@@ -129,7 +149,7 @@ export async function POST(req: Request) {
           line_items: [
             {
               price_data: {
-                currency: product.currency.toLowerCase(),
+                currency: currency.toLowerCase(),
                 product_data: {
                   name: product.name,
                   images: product.images?.length ? [product.images[0]] : [],
@@ -164,7 +184,8 @@ export async function POST(req: Request) {
       const client = initializePayPal();
       const request = new paypal.orders.OrdersCreateRequest();
 
-      const usdTotal = toUsd(totalPrice, product.currency).toFixed(2);
+      // PayPal sandbox TRY desteklemediği için tutarı USD'ye çeviriyoruz.
+      const usdTotal = convertAmount(totalPrice, currency, "USD", rates).toFixed(2);
 
       request.requestBody({
         intent: "CAPTURE",

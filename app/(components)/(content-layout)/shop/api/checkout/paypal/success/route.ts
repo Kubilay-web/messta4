@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
           totalPrice: order.totalPrice,
           status: order.status,
           productName: order.product?.name || "Ürün",
-          currency: order.product?.currency || "TRY",
+          currency: order.currency || order.product?.currency || "TRY",
         });
       } catch (mailErr) {
         console.error("[shop/paypal success] fatura maili gonderilemedi", mailErr);

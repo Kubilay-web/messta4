@@ -27,16 +27,57 @@ interface ShopOrder {
   city: string;
   quantity: number;
   totalPrice: number;
+  currency: string;
   status: string;
+  paymentMethod: string;
+  trackingNumber?: string | null;
+  cargoCompany?: string | null;
   createdAt: string;
   product?: { name: string } | null;
 }
 
-const STATUSES = ["PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELLED"];
+interface ShopMessage {
+  id: string;
+  fullName: string;
+  email: string;
+  phone?: string | null;
+  subject: string;
+  message: string;
+  status: string;
+  createdAt: string;
+}
+
+const STATUSES = [
+  "PENDING",
+  "PAID",
+  "PROCESSING",
+  "SHIPPED",
+  "DELIVERED",
+  "CANCELLED",
+];
+
+// Sipariş durumu Türkçe etiketleri (ürün sahibi bunları değiştirir)
+const STATUS_LABEL: Record<string, string> = {
+  PENDING: "Sipariş Alındı",
+  PAID: "Ödendi",
+  PROCESSING: "Hazırlanıyor",
+  SHIPPED: "Kargoda",
+  DELIVERED: "Teslim Edildi",
+  CANCELLED: "İptal Edildi",
+};
+
+// Ödeme yöntemi Türkçe etiketleri
+const PAYMENT_LABEL: Record<string, string> = {
+  stripe: "Online Kart",
+  paypal: "PayPal",
+  cod_cash: "Kapıda Nakit",
+  cod_card: "Kapıda Kart",
+};
 
 const statusBadge: Record<string, string> = {
   PENDING: "bg-warning/10 text-warning",
   PAID: "bg-success/10 text-success",
+  PROCESSING: "bg-secondary/10 text-secondary",
   SHIPPED: "bg-info/10 text-info",
   DELIVERED: "bg-primary/10 text-primary",
   CANCELLED: "bg-danger/10 text-danger",
@@ -60,10 +101,12 @@ const ShopAdmin = () => {
     "loading"
   );
   const [canClaim, setCanClaim] = useState(false);
-  const [tab, setTab] = useState<"products" | "orders">("products");
+  const [tab, setTab] = useState<"products" | "orders" | "messages">("products");
 
   const [products, setProducts] = useState<ShopProduct[]>([]);
   const [orders, setOrders] = useState<ShopOrder[]>([]);
+  const [messages, setMessages] = useState<ShopMessage[]>([]);
+  const [openMessage, setOpenMessage] = useState<ShopMessage | null>(null);
   const [form, setForm] = useState<typeof emptyProduct>(emptyProduct);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -78,15 +121,20 @@ const ShopAdmin = () => {
     }).format(n);
 
   const loadAll = async () => {
-    const [pRes, oRes] = await Promise.all([
+    const [pRes, oRes, mRes] = await Promise.all([
       fetch("/shop/api/products?all=1", { cache: "no-store" }),
       fetch("/shop/api/order", { cache: "no-store" }),
+      fetch("/shop/api/contact", { cache: "no-store" }),
     ]);
     const pData = await pRes.json();
     const oData = await oRes.json();
+    const mData = await mRes.json();
     setProducts(pData.products || []);
     setOrders(oData.orders || []);
+    setMessages(mData.messages || []);
   };
+
+  const unreadCount = messages.filter((m) => m.status === "NEW").length;
 
   useEffect(() => {
     const init = async () => {
@@ -241,6 +289,62 @@ const ShopAdmin = () => {
     } else toast.error("Güncellenemedi");
   };
 
+  // Kargo takip bilgisini kaydet (firma + takip no). Alıcı bunu takip eder.
+  const saveTracking = async (
+    id: string,
+    cargoCompany: string,
+    trackingNumber: string
+  ) => {
+    const res = await fetch(`/shop/api/order/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cargoCompany, trackingNumber }),
+    });
+    if (res.ok) {
+      toast.success("Kargo bilgisi kaydedildi");
+      loadAll();
+    } else toast.error("Kaydedilemedi");
+  };
+
+  // --- Bize Ulaşın mesajları ---
+  const openMessageDetail = async (m: ShopMessage) => {
+    setOpenMessage(m);
+    if (m.status === "NEW") {
+      await fetch(`/shop/api/contact/${m.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "READ" }),
+      });
+      setMessages((prev) =>
+        prev.map((x) => (x.id === m.id ? { ...x, status: "READ" } : x))
+      );
+    }
+  };
+
+  const setMessageStatus = async (id: string, status: string) => {
+    const res = await fetch(`/shop/api/contact/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (res.ok) {
+      setMessages((prev) =>
+        prev.map((x) => (x.id === id ? { ...x, status } : x))
+      );
+      if (openMessage?.id === id) setOpenMessage({ ...openMessage, status });
+    } else toast.error("Güncellenemedi");
+  };
+
+  const deleteMessage = async (id: string) => {
+    if (!confirm("Bu mesaj silinsin mi?")) return;
+    const res = await fetch(`/shop/api/contact/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setMessages((prev) => prev.filter((x) => x.id !== id));
+      if (openMessage?.id === id) setOpenMessage(null);
+      toast.success("Mesaj silindi");
+    } else toast.error("Silinemedi");
+  };
+
   const resendInvoice = async (id: string) => {
     const res = await fetch(`/shop/api/order/${id}/resend-invoice`, {
       method: "POST",
@@ -379,6 +483,17 @@ const ShopAdmin = () => {
               className={`ti-btn ti-btn-sm ${tab === "orders" ? "ti-btn-primary" : "ti-btn-light"}`}
             >
               <i className="ri-file-list-3-line me-1"></i> Siparişler
+            </button>
+            <button
+              onClick={() => setTab("messages")}
+              className={`ti-btn ti-btn-sm relative ${tab === "messages" ? "ti-btn-primary" : "ti-btn-light"}`}
+            >
+              <i className="ri-mail-line me-1"></i> Mesajlar
+              {unreadCount > 0 && (
+                <span className="absolute -top-2 -end-2 bg-danger text-white text-[0.65rem] min-w-[1.1rem] h-[1.1rem] px-1 rounded-full flex items-center justify-center">
+                  {unreadCount}
+                </span>
+              )}
             </button>
           </div>
           {tab === "products" && (
@@ -669,7 +784,9 @@ const ShopAdmin = () => {
                     <th>Ürün</th>
                     <th>Adet</th>
                     <th>Tutar</th>
+                    <th>Ödeme</th>
                     <th>Durum</th>
+                    <th>Kargo Takip</th>
                     <th>Tarih</th>
                     <th className="text-end">Fatura</th>
                   </tr>
@@ -677,7 +794,7 @@ const ShopAdmin = () => {
                 <tbody>
                   {orders.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="text-center text-muted py-6">
+                      <td colSpan={9} className="text-center text-muted py-6">
                         Henüz sipariş yok.
                       </td>
                     </tr>
@@ -692,7 +809,14 @@ const ShopAdmin = () => {
                       </td>
                       <td>{o.product?.name || "-"}</td>
                       <td>{o.quantity}</td>
-                      <td className="font-medium">{fmt(o.totalPrice)}</td>
+                      <td className="font-medium">
+                        {fmt(o.totalPrice, o.currency || "TRY")}
+                      </td>
+                      <td>
+                        <span className="badge bg-light text-default">
+                          {PAYMENT_LABEL[o.paymentMethod] || o.paymentMethod}
+                        </span>
+                      </td>
                       <td>
                         <select
                           value={o.status}
@@ -701,10 +825,17 @@ const ShopAdmin = () => {
                         >
                           {STATUSES.map((s) => (
                             <option key={s} value={s}>
-                              {s}
+                              {STATUS_LABEL[s] || s}
                             </option>
                           ))}
                         </select>
+                      </td>
+                      <td>
+                        <TrackingCell
+                          cargoCompany={o.cargoCompany || ""}
+                          trackingNumber={o.trackingNumber || ""}
+                          onSave={(c, tn) => saveTracking(o.id, c, tn)}
+                        />
                       </td>
                       <td className="text-muted text-xs">
                         {new Date(o.createdAt).toLocaleDateString("tr-TR")}
@@ -735,11 +866,208 @@ const ShopAdmin = () => {
               </table>
             </div>
           )}
+
+          {/* MESAJLAR TABLOSU (Bize Ulaşın) */}
+          {tab === "messages" && (
+            <div className="overflow-x-auto">
+              <table className="table table-hover whitespace-nowrap min-w-full">
+                <thead>
+                  <tr className="border-b border-defaultborder">
+                    <th>Durum</th>
+                    <th>Gönderen</th>
+                    <th>Konu</th>
+                    <th>Tarih</th>
+                    <th className="text-end">İşlem</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {messages.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-center text-muted py-6">
+                        Henüz mesaj yok.
+                      </td>
+                    </tr>
+                  )}
+                  {messages.map((m) => (
+                    <tr
+                      key={m.id}
+                      className={`border-b border-defaultborder/50 ${
+                        m.status === "NEW" ? "font-semibold" : ""
+                      }`}
+                    >
+                      <td>
+                        {m.status === "NEW" && (
+                          <span className="badge bg-danger/10 text-danger">Yeni</span>
+                        )}
+                        {m.status === "READ" && (
+                          <span className="badge bg-info/10 text-info">Okundu</span>
+                        )}
+                        {m.status === "REPLIED" && (
+                          <span className="badge bg-success/10 text-success">
+                            Yanıtlandı
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="flex flex-col">
+                          <span>{m.fullName}</span>
+                          <span className="text-muted text-xs font-normal">
+                            {m.email}
+                            {m.phone ? ` · ${m.phone}` : ""}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="max-w-[16rem] truncate">{m.subject}</td>
+                      <td className="text-muted text-xs font-normal">
+                        {new Date(m.createdAt).toLocaleString("tr-TR")}
+                      </td>
+                      <td className="text-end">
+                        <div className="flex gap-1 justify-end">
+                          <button
+                            onClick={() => openMessageDetail(m)}
+                            className="ti-btn ti-btn-light ti-btn-sm"
+                            title="Görüntüle"
+                          >
+                            <i className="ri-eye-line"></i>
+                          </button>
+                          <a
+                            href={`mailto:${m.email}?subject=${encodeURIComponent(
+                              "Re: " + m.subject
+                            )}`}
+                            onClick={() => setMessageStatus(m.id, "REPLIED")}
+                            className="ti-btn ti-btn-primary ti-btn-sm"
+                            title="E-posta ile yanıtla"
+                          >
+                            <i className="ri-reply-line"></i>
+                          </a>
+                          <button
+                            onClick={() => deleteMessage(m.id)}
+                            className="ti-btn ti-btn-danger ti-btn-sm"
+                            title="Sil"
+                          >
+                            <i className="ri-delete-bin-line"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
       </div>
+
+      {/* MESAJ DETAY MODALI */}
+      {openMessage && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setOpenMessage(null)}
+        >
+          <div
+            className="bg-white dark:bg-bodybg rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-defaultborder dark:border-defaultborder/10">
+              <h6 className="font-semibold mb-0">{openMessage.subject}</h6>
+              <button
+                onClick={() => setOpenMessage(null)}
+                className="text-muted hover:text-danger"
+              >
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+            <div className="p-4 flex flex-col gap-3">
+              <div className="text-sm">
+                <span className="text-muted">Gönderen: </span>
+                <span className="font-medium">{openMessage.fullName}</span>
+              </div>
+              <div className="text-sm flex flex-wrap gap-x-4">
+                <span>
+                  <span className="text-muted">E-posta: </span>
+                  {openMessage.email}
+                </span>
+                {openMessage.phone && (
+                  <span>
+                    <span className="text-muted">Telefon: </span>
+                    {openMessage.phone}
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-muted">
+                {new Date(openMessage.createdAt).toLocaleString("tr-TR")}
+              </div>
+              <div className="bg-gray-50 dark:bg-bodybg2/40 rounded-md p-3 text-sm whitespace-pre-wrap">
+                {openMessage.message}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 justify-end p-4 border-t border-defaultborder dark:border-defaultborder/10">
+              <a
+                href={`mailto:${openMessage.email}?subject=${encodeURIComponent(
+                  "Re: " + openMessage.subject
+                )}`}
+                onClick={() => setMessageStatus(openMessage.id, "REPLIED")}
+                className="ti-btn ti-btn-primary ti-btn-sm"
+              >
+                <i className="ri-reply-line me-1"></i> E-posta ile Yanıtla
+              </a>
+              <button
+                onClick={() => deleteMessage(openMessage.id)}
+                className="ti-btn ti-btn-danger-light ti-btn-sm"
+              >
+                <i className="ri-delete-bin-line me-1"></i> Sil
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Fragment>
   );
 };
+
+// Kargo takip hücresi — firma ve takip no için satır içi düzenleme.
+function TrackingCell({
+  cargoCompany,
+  trackingNumber,
+  onSave,
+}: {
+  cargoCompany: string;
+  trackingNumber: string;
+  onSave: (cargoCompany: string, trackingNumber: string) => void;
+}) {
+  const [company, setCompany] = useState(cargoCompany);
+  const [tracking, setTracking] = useState(trackingNumber);
+  const dirty = company !== cargoCompany || tracking !== trackingNumber;
+
+  return (
+    <div className="flex items-center gap-1">
+      <div className="flex flex-col gap-1">
+        <input
+          value={company}
+          onChange={(e) => setCompany(e.target.value)}
+          placeholder="Kargo firması"
+          className="form-control form-control-sm !py-1 !text-xs w-32"
+        />
+        <input
+          value={tracking}
+          onChange={(e) => setTracking(e.target.value)}
+          placeholder="Takip no"
+          className="form-control form-control-sm !py-1 !text-xs w-32"
+        />
+      </div>
+      <button
+        onClick={() => onSave(company.trim(), tracking.trim())}
+        disabled={!dirty}
+        className={`ti-btn ti-btn-sm ${
+          dirty ? "ti-btn-success" : "ti-btn-light"
+        }`}
+        title="Kargo bilgisini kaydet"
+      >
+        <i className="ri-save-line"></i>
+      </button>
+    </div>
+  );
+}
 
 export default ShopAdmin;

@@ -4,7 +4,14 @@ import db from "@/app/lib/db";
 import { NextResponse } from "next/server";
 import { requireShopAdmin } from "../../../lib/auth";
 
-const STATUSES = ["PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELLED"];
+const STATUSES = [
+  "PENDING",
+  "PAID",
+  "PROCESSING",
+  "SHIPPED",
+  "DELIVERED",
+  "CANCELLED",
+];
 
 export async function PATCH(
   req: Request,
@@ -16,14 +23,29 @@ export async function PATCH(
       return NextResponse.json({ error: guard.error }, { status: guard.status });
 
     const { id } = await params;
-    const { status } = await req.json();
+    const { status, trackingNumber, cargoCompany } = await req.json();
 
-    if (!STATUSES.includes(status))
-      return NextResponse.json({ error: "Geçersiz durum" }, { status: 400 });
+    // Güncellenecek alanları topla (sadece gönderilenler)
+    const data: Record<string, any> = {};
+    if (status !== undefined) {
+      if (!STATUSES.includes(status))
+        return NextResponse.json({ error: "Geçersiz durum" }, { status: 400 });
+      data.status = status;
+    }
+    if (trackingNumber !== undefined)
+      data.trackingNumber = trackingNumber ? String(trackingNumber).trim() : null;
+    if (cargoCompany !== undefined)
+      data.cargoCompany = cargoCompany ? String(cargoCompany).trim() : null;
+
+    if (Object.keys(data).length === 0)
+      return NextResponse.json(
+        { error: "Güncellenecek alan yok" },
+        { status: 400 }
+      );
 
     const order = await db.shopOrder.update({
       where: { id },
-      data: { status },
+      data,
     });
 
     return NextResponse.json({ ok: true, order });

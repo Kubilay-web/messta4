@@ -36,7 +36,7 @@ export async function POST(
       totalPrice: order.totalPrice,
       status: order.status,
       productName: order.product?.name || "Ürün",
-      currency: order.product?.currency || "TRY",
+      currency: order.currency || order.product?.currency || "TRY",
     });
 
     return NextResponse.json({ ok: true, message: "Fatura e-postası gönderildi" });

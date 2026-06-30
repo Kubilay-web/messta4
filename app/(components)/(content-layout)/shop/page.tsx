@@ -3,7 +3,7 @@
 import Link from "next/link";
 import React, { Fragment, useEffect, useState } from "react";
 import { Toaster, toast } from "sonner";
-import { shopLogout } from "./lib/actions";
+import { useShopSettings } from "./lib/shop-settings";
 
 interface ShopProduct {
   id: string;
@@ -19,24 +19,13 @@ interface ShopProduct {
   numReviews: number;
 }
 
-interface MeInfo {
-  isAdmin: boolean;
-  canClaimAdmin: boolean;
-}
-
 const Shop = () => {
+  const { t, money } = useShopSettings();
   const [products, setProducts] = useState<ShopProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [me, setMe] = useState<MeInfo>({ isAdmin: false, canClaimAdmin: false });
+  const [isAdmin, setIsAdmin] = useState(false);
   const [seeding, setSeeding] = useState(false);
-
-  const fmt = (n: number, currency = "TRY") =>
-    new Intl.NumberFormat("tr-TR", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(n);
 
   const fetchProducts = async (q = "") => {
     setLoading(true);
@@ -58,8 +47,7 @@ const Shop = () => {
     try {
       const res = await fetch("/shop/api/me", { cache: "no-store" });
       const data = await res.json();
-      if (data.user)
-        setMe({ isAdmin: !!data.user.isAdmin, canClaimAdmin: !!data.canClaimAdmin });
+      if (data.user) setIsAdmin(!!data.user.isAdmin);
     } catch {}
   };
 
@@ -85,21 +73,10 @@ const Shop = () => {
 
   // arama: yazarken 400ms debounce
   useEffect(() => {
-    const t = setTimeout(() => fetchProducts(search), 400);
-    return () => clearTimeout(t);
+    const tm = setTimeout(() => fetchProducts(search), 400);
+    return () => clearTimeout(tm);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
-
-  const claimAdmin = async () => {
-    const res = await fetch("/shop/api/admin/claim", { method: "POST" });
-    const data = await res.json();
-    if (res.ok) {
-      toast.success(data.message || "Yönetici oldunuz");
-      setMe((m) => ({ ...m, isAdmin: true, canClaimAdmin: false }));
-    } else {
-      toast.error(data.error || "İşlem başarısız");
-    }
-  };
 
   const seedDemo = async () => {
     setSeeding(true);
@@ -144,44 +121,27 @@ const Shop = () => {
       <Toaster richColors position="top-right" />
 
       <div className="flex flex-col gap-4 p-4 sm:p-6 max-w-[1400px] mx-auto w-full">
-        {/* Sayfa başlığı (Pageheader yerine) */}
+        {/* Sayfa başlığı */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <h1 className="text-xl sm:text-2xl font-bold mb-0">Mağaza</h1>
+          <h1 className="text-xl sm:text-2xl font-bold mb-0">{t("store")}</h1>
           <nav className="flex items-center gap-2 text-sm text-muted">
-            <span>E-Ticaret</span>
+            <span>{t("ecommerce")}</span>
             <i className="ri-arrow-right-s-line"></i>
-            <span className="text-primary">Mağaza</span>
+            <span className="text-primary">{t("store")}</span>
           </nav>
         </div>
 
-        {/* Üst bar: arama + admin */}
+        {/* Arama */}
         <div className="box">
-          <div className="box-body flex flex-col sm:flex-row gap-3 sm:items-center">
+          <div className="box-body">
             <div className="relative flex-1 min-w-0">
-              {/* <i className="ri-search-line absolute top-1/2 -translate-y-1/2 start-3 text-muted"></i> */}
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Ürün ara..."
-                className="form-control ps-9 w-full"
+                placeholder={t("searchPlaceholder")}
+                className="form-control w-full"
               />
             </div>
-            {me.isAdmin && (
-              <Link
-                href="/shop/admin"
-                className="ti-btn ti-btn-primary whitespace-nowrap shrink-0"
-              >
-                <i className="ri-settings-3-line me-1"></i> Admin Paneli
-              </Link>
-            )}
-            <form action={shopLogout} className="shrink-0">
-              <button
-                type="submit"
-                className="ti-btn ti-btn-danger-light whitespace-nowrap w-full"
-              >
-                <i className="ri-logout-box-r-line me-1"></i> Çıkış Yap
-              </button>
-            </form>
           </div>
         </div>
 
@@ -189,9 +149,9 @@ const Shop = () => {
         {loading && (
           <div className="flex items-center justify-center py-20">
             <span className="ti-spinner text-primary" role="status">
-              <span className="sr-only">Yükleniyor...</span>
+              <span className="sr-only">{t("loading")}</span>
             </span>
-            <span className="ms-3 text-muted">Ürünler yükleniyor...</span>
+            <span className="ms-3 text-muted">{t("productsLoading")}</span>
           </div>
         )}
 
@@ -202,17 +162,13 @@ const Shop = () => {
               <i className="ri-shopping-bag-3-line text-[3rem] text-muted"></i>
               <div>
                 <h5 className="font-semibold mb-1">
-                  {search ? "Sonuç bulunamadı" : "Henüz satışta ürün yok"}
+                  {search ? t("noProductsResultTitle") : t("noProductsTitle")}
                 </h5>
                 <p className="text-muted mb-0">
-                  {search
-                    ? "Farklı bir arama deneyin."
-                    : me.isAdmin
-                    ? "Admin panelinden ürün ekleyin."
-                    : "Yakında ürünlerimiz burada olacak."}
+                  {search ? t("noProductsResultDesc") : t("comingSoon")}
                 </p>
               </div>
-              {!search && me.isAdmin && (
+              {!search && isAdmin && (
                 <div className="flex flex-wrap justify-center gap-2">
                   <Link href="/shop/admin" className="ti-btn ti-btn-primary">
                     Ürün Ekle
@@ -230,7 +186,7 @@ const Shop = () => {
           </div>
         )}
 
-        {/* Ürün listesi — flexbox responsive */}
+        {/* Ürün listesi */}
         {!loading && products.length > 0 && (
           <div className="flex flex-wrap gap-4">
             {products.map((p) => (
@@ -273,26 +229,26 @@ const Shop = () => {
                   </div>
                   <div className="flex flex-wrap items-end gap-2">
                     <span className="text-lg font-bold text-primary">
-                      {fmt(p.price, p.currency)}
+                      {money(p.price, p.currency)}
                     </span>
                     {p.oldPrice && p.oldPrice > p.price && (
                       <span className="text-muted line-through text-sm">
-                        {fmt(p.oldPrice, p.currency)}
+                        {money(p.oldPrice, p.currency)}
                       </span>
                     )}
                   </div>
                   <div className="flex items-center justify-between gap-2 mt-auto pt-1">
                     {p.stock > 0 ? (
                       <span className="badge bg-success/10 text-success text-xs">
-                        Stok: {p.stock}
+                        {t("inStock")}: {p.stock}
                       </span>
                     ) : (
                       <span className="badge bg-danger/10 text-danger text-xs">
-                        Tükendi
+                        {t("soldOut")}
                       </span>
                     )}
                     <span className="text-primary text-sm font-medium whitespace-nowrap">
-                      İncele <i className="ri-arrow-right-line"></i>
+                      {t("examine")} <i className="ri-arrow-right-line"></i>
                     </span>
                   </div>
                 </div>

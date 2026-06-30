@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
 import { validateRequest } from "@/app/auth";
+import { isShopAdminRole } from "./lib/auth";
+import { getServerLocale } from "@/app/lib/locale";
+import ShopShell from "./components/ShopShell";
 
 export const dynamic = "force-dynamic";
 
@@ -12,5 +15,12 @@ export default async function ShopLayout({
   const { user } = await validateRequest();
   if (!user) redirect("/login?redirect=/shop");
 
-  return <>{children}</>;
+  const isAdmin = isShopAdminRole(user.shopNewRole);
+  const initialLang = await getServerLocale();
+
+  return (
+    <ShopShell isAdmin={isAdmin} initialLang={initialLang}>
+      {children}
+    </ShopShell>
+  );
 }

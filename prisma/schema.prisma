@@ -78,6 +78,7 @@ model User {
   portfolioProfile   PortfolioProfile?
   subscribersProject Subscriber[]
   shopOrders         ShopOrder[]       @relation("UserToShopOrder")
+  shopContactMessages ShopContactMessage[] @relation("UserToShopContactMessage")
   isVerfied          Boolean           @default(false)
   token              Int?
 
@@ -7119,7 +7120,16 @@ model ShopOrder {
   city         String
   note         String?
 
-  status String @default("PENDING") // PENDING | PAID | SHIPPED | DELIVERED | CANCELLED
+  status String @default("PENDING") // PENDING | PAID | PROCESSING | SHIPPED | DELIVERED | CANCELLED
+
+  // Ödeme yöntemi: stripe | paypal | cod_cash (kapıda nakit) | cod_card (kapıda kart)
+  paymentMethod String @default("stripe")
+  // Siparişin alındığı / ücretlendirildiği para birimi (TRY | USD | EUR)
+  currency String @default("TRY")
+
+  // Kargo takip bilgileri (ürün sahibi/yönetici doldurur, alıcı takip eder)
+  trackingNumber String?
+  cargoCompany   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -7127,4 +7137,27 @@ model ShopOrder {
   @@index([productId])
   @@index([userId])
   @@map("shop_orders")
+}
+
+// Mağaza "Bize Ulaşın" mesajları — alıcı/ziyaretçi gönderir, admin panelinde görünür.
+model ShopContactMessage {
+  id       String  @id @default(cuid()) @map("_id")
+  fullName String
+  email    String
+  phone    String?
+  subject  String
+  message  String
+
+  // NEW (yeni) | READ (okundu) | REPLIED (yanıtlandı)
+  status String @default("NEW")
+
+  // Giriş yapmış kullanıcı gönderdiyse bağlanır (misafirde null)
+  userId String?
+  user   User?   @relation("UserToShopContactMessage", fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("shop_contact_messages")
 }
